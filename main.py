@@ -96,6 +96,7 @@ def get_message_info(message):
 
 async def parse_queue():
     await client.wait_until_ready()
+    log.info("parse_queue() running")
     while True:
         now = datetime.now()
         for k, v in post_queue.items():
@@ -105,8 +106,9 @@ async def parse_queue():
                 log.info("Status ready")
                 info = get_message_info(v)
                 twitter_api.PostUpdate(info['message'], info['image_link'])
-                log.info("Status posted: {0}, {1}".format(info['message'], info['image_link'])) 
-        await asyncio.sleep(600)
+                log.info("Status posted: {0}, {1}".format(info['message'], info['image_link']))
+                post_queue.pop(k)
+        await asyncio.sleep(300)
 
 
 @client.event
@@ -123,7 +125,7 @@ async def on_message(message):
         return
 
     post_queue[message.timestamp] = message
-    log.info("Starboard message added!")
+    log.info("Starboard message detected!")
 
 
 client.loop.create_task(parse_queue())
