@@ -114,7 +114,6 @@ async def on_ready():
     log.info('Logged into Discord as')
     log.info(client.user.name)
     log.info(client.user.id)
-    client.loop.
     log.info('------')
 
 
