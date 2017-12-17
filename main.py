@@ -95,17 +95,18 @@ def get_message_info(message):
 
 
 async def parse_queue():
+    await client.wait_until_ready()
     while True:
         now = datetime.now()
         for k, v in post_queue.items():
-            if k + timedelta(minutes=3) > now:
+            if k + timedelta(minutes=30) > now:
                 continue
             else:
+                log.info("Status ready")
                 info = get_message_info(v)
                 twitter_api.PostUpdate(info['message'], info['image_link'])
-                pass
-                # post shit
-        asyncio.sleep(600)
+                log.info("Status posted: {0}, {1}".format(info['message'], info['image_link'])) 
+        await asyncio.sleep(600)
 
 
 @client.event
@@ -113,6 +114,7 @@ async def on_ready():
     log.info('Logged into Discord as')
     log.info(client.user.name)
     log.info(client.user.id)
+    client.loop.
     log.info('------')
 
 
@@ -122,6 +124,9 @@ async def on_message(message):
         return
 
     post_queue[message.timestamp] = message
+    log.info("Starboard message added!")
 
 
+client.loop.create_task(parse_queue())
+log.info("parse_queue() successfully added")
 client.run(EMAIL, PASSWORD)
