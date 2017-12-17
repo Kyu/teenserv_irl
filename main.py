@@ -71,7 +71,7 @@ client = discord.Client()
 post_queue = {}
 
 
-def get_message_info(message):
+def get_message_info(message, author):
     image_link = ''
     real_msg = ''
     text = message.content
@@ -80,15 +80,13 @@ def get_message_info(message):
     stars = re.search('(?<=\*\*)(.*?)(?=\*\*)', text).group(0)  # Finds text between the **'s
 
     embed = message.embeds[0]
-    author_id = re.search('(?<=/)(.*?)(?=/)', embed['author']['icon_url'][34:])  # Id from icon url link
-    author = message.server.get_member(author_id)
     if 'description' in embed:
         real_msg = embed['description']
     if 'image' in embed:
         image_link = embed['image']['url']
 
     status = "{emoji} {count}: {channel}\n{author}\n\n{text}".format(emoji=star_emoji, count=stars,
-                                                                     channel=star_channel, author=str(author),
+                                                                     channel=star_channel, author=author,
                                                                      text=real_msg)
     info = {'message': status, 'image': image_link}
     return info
@@ -98,17 +96,17 @@ async def parse_queue():
     await client.wait_until_ready()
     log.info("parse_queue() running")
     while True:
-        now = datetime.now()
+        now = datetime.utcnow()
         for k, v in post_queue.items():
-            if k + timedelta(minutes=30) > now:
-                continue
+            if k + timedelta(minutes=3) > now:
+                pass
             else:
                 log.info("Status ready")
-                info = get_message_info(v)
-                twitter_api.PostUpdate(info['message'], info['image_link'])
-                log.info("Status posted: {0}, {1}".format(info['message'], info['image_link']))
+                info = get_message_info(v[0], v[1])
+                twitter_api.PostUpdate(info['message'], info['image'])
+                log.info("Status posted: {0}, {1}".format(info['message'], info['image']))
                 post_queue.pop(k)
-        await asyncio.sleep(300)
+        await asyncio.sleep(10)
 
 
 @client.event
@@ -123,8 +121,10 @@ async def on_ready():
 async def on_message(message):
     if message.author.id != BOT_ID or message.channel.id != STARBOARD_ID:
         return
-
-    post_queue[message.timestamp] = message
+    
+    author_id = re.search('(?<=/)(.*?)(?=/)', message.embeds[0]['author']['icon_url'][32:])  # Id from icon url link
+    author = message.server.get_member(author_id)
+    post_queue[message.timestamp] = [message, str(author)]
     log.info("Starboard message detected!")
 
 
