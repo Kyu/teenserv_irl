@@ -71,6 +71,30 @@ client = discord.Client()
 post_queue = {}
 
 
+def clean_message(message, content):
+    transformations = {}
+
+    mentions = re.findall(r'<@!?([0-9]+)>', content)
+    mentions = [message.server.get_member(i) for i in mentions]
+    mention_transforms = {
+        re.escape('<@{0.id}>'.format(member)): '@' + member.display_name
+        for member in mentions
+    }
+
+    for k, v in mention_transforms.items():
+        if k in content:
+            content = content.replace(k, v)
+    
+    transformations.update(mention_transforms)
+
+    transformations = {
+        '@everyone': '@\u200beveryone',
+        '@here': '@\u200bhere'
+    }
+
+    return content
+
+
 def get_message_info(message, author):
     image_link = ''
     real_msg = ''
@@ -81,7 +105,7 @@ def get_message_info(message, author):
 
     embed = message.embeds[0]
     if 'description' in embed:
-        real_msg = embed['description']
+        real_msg = clean_message(message, embed['description'])
     if 'image' in embed:
         image_link = embed['image']['url']
 
@@ -96,17 +120,26 @@ async def parse_queue():
     await client.wait_until_ready()
     log.info("parse_queue() running")
     while True:
+        remove = []
         now = datetime.utcnow()
         for k, v in post_queue.items():
-            if k + timedelta(minutes=3) > now:
+            if k + timedelta(minutes=10) > now:
                 pass
             else:
                 log.info("Status ready")
                 info = get_message_info(v[0], v[1])
-                twitter_api.PostUpdate(info['message'], info['image'])
-                log.info("Status posted: {0}, {1}".format(info['message'], info['image']))
-                post_queue.pop(k)
+                status = "Status posted: {0}, {1}".format(info['message'], info['image'])
+                try:
+                    twitter_api.PostUpdate(info['message'], info['image'])
+                except twitter.error.TwitterError:
+                    twitter_api.PostUpdate(info['message'][:139], info['image'])
+                    status = "Truncated " + msg
+                log.info(status)
+                remove.append(k)
         await asyncio.sleep(10)
+        for i in remove:
+            post_queue.pop(i)
+            remove.pop(0)
 
 
 @client.event
@@ -122,7 +155,7 @@ async def on_message(message):
     if message.author.id != BOT_ID or message.channel.id != STARBOARD_ID:
         return
     
-    author_id = re.search('(?<=/)(.*?)(?=/)', message.embeds[0]['author']['icon_url'][32:])  # Id from icon url link
+    author_id = re.search('(?<=/)(.*?)(?=/)', message.embeds[0]['author']['icon_url'][32:]).group(0) # Id from icon url link
     author = message.server.get_member(author_id)
     post_queue[message.timestamp] = [message, str(author)]
     log.info("Starboard message detected!")
