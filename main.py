@@ -53,12 +53,17 @@ else:
 # Logging in to discord
 try:
     discord_config = config['credentials:discord']
-    EMAIL = discord_config['email']
-    PASSWORD = discord_config['password']
+    USE_TOKEN = discord_config.get('token')
+    EMAIL = ''
+    PASSWORD = ''
+    if not USE_TOKEN:
+        EMAIL = discord_config['email']
+        PASSWORD = discord_config['password']
 
     starboard_info = config['starboard_info']
     STARBOARD_ID = starboard_info['channel_id']
     BOT_ID = starboard_info['bot_id']
+    WAIT_TIME = starboard_info.get('wait_time', fallback=5)
 except KeyError as e:
     log.error("Fix your discord config section!")
     msg = "{err} on twitter config ".format(
@@ -122,8 +127,8 @@ async def parse_queue():
     while True:
         remove = []
         now = datetime.utcnow()
-        for k, v in post_queue.items():
-            if k + timedelta(minutes=10) > now:
+        for k, v in post_queue.copy().items():
+            if k + timedelta(minutes=WAIT_TIME) > now:
                 pass
             else:
                 log.info("Status ready")
@@ -136,7 +141,7 @@ async def parse_queue():
                     status = "Truncated " + msg
                 log.info(status)
                 remove.append(k)
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
         for i in remove:
             post_queue.pop(i)
             remove.pop(0)
@@ -148,19 +153,23 @@ async def on_ready():
     log.info(client.user.name)
     log.info(client.user.id)
     log.info('------')
+    log.info("Started!")
 
 
 @client.event
 async def on_message(message):
     if message.author.id != BOT_ID or message.channel.id != STARBOARD_ID:
         return
-    
+
+    log.info("Starboard message detected!")
     author_id = re.search('(?<=/)(.*?)(?=/)', message.embeds[0]['author']['icon_url'][32:]).group(0) # Id from icon url link
     author = message.server.get_member(author_id)
     post_queue[message.timestamp] = [message, str(author)]
-    log.info("Starboard message detected!")
-
 
 client.loop.create_task(parse_queue())
 log.info("parse_queue() successfully added")
-client.run(EMAIL, PASSWORD)
+
+if not USE_TOKEN:
+    client.run(EMAIL, PASSWORD)
+else:
+    client.run(USE_TOKEN)
