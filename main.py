@@ -144,10 +144,10 @@ async def on_ready():
 
 @client.event
 async def on_reaction_add(reaction, user):
-    if reaction.message.channel.id != SERVER_ID:
+    if reaction.message.server.id != SERVER_ID:
         return
 
-    if not (reaction.emoji.id == '393129724211232768' and reaction.count >= 10):
+    if not (reaction.emoji == '\N{WHITE MEDIUM STAR}' and reaction.count >= 10):
         return
 
     log.info("Starboard message detected!")
