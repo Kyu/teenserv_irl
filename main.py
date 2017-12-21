@@ -3,7 +3,6 @@ import sys
 import logging
 from datetime import datetime, timedelta
 from configparser import ConfigParser
-import re
 
 import asyncio
 import discord
@@ -13,11 +12,7 @@ import twitter
 log = logging.getLogger(__name__)
 formatter = logging.Formatter(
     '%(asctime)s %(levelname)-5.5s [%(name)s:%(lineno)s][%(threadName)s] %(message)s')
-
-ch = logging.StreamHandler()
-ch.setFormatter(formatter)
-log.setLevel('DEBUG')
-log.addHandler(ch)
+logging.basicConfig(level=logging.INFO)
 
 log.info('------')
 config = ConfigParser()
@@ -61,8 +56,7 @@ try:
         PASSWORD = discord_config['password']
 
     starboard_info = config['starboard_info']
-    STARBOARD_ID = starboard_info['channel_id']
-    BOT_ID = starboard_info['bot_id']
+    SERVER_ID = starboard_info['server_id']
     WAIT_TIME = starboard_info.get('wait_time', fallback=5)
 except KeyError as e:
     log.error("Fix your discord config section!")
@@ -76,47 +70,39 @@ client = discord.Client()
 post_queue = {}
 
 
-def clean_message(message, content):
-    transformations = {}
-
-    mentions = re.findall(r'<@!?([0-9]+)>', content)
-    mentions = [message.server.get_member(i) for i in mentions]
-    mention_transforms = {
-        re.escape('<@{0.id}>'.format(member)): '@' + member.display_name
-        for member in mentions
-    }
-
-    for k, v in mention_transforms.items():
-        if k in content:
-            content = content.replace(k, v)
-    
-    transformations.update(mention_transforms)
-
-    transformations = {
-        '@everyone': '@\u200beveryone',
-        '@here': '@\u200bhere'
-    }
-
-    return content
-
-
 def get_message_info(message, author):
     image_link = ''
-    real_msg = ''
-    text = message.content
-    star_emoji = text[0]
-    star_channel = '#' + str(message.channel_mentions[0])
-    stars = re.search('(?<=\*\*)(.*?)(?=\*\*)', text).group(0)  # Finds text between the **'s
+    text = message.clean_content
+    star_channel = '#' + str(message.channel.name)
+    stars = [i.count for i in message.reactions if i.id == '393129724211232768'][0]  # test
 
-    embed = message.embeds[0]
-    if 'description' in embed:
-        real_msg = clean_message(message, embed['description'])
-    if 'image' in embed:
-        image_link = embed['image']['url']
+    if message.embeds:
+        data = message.embeds[0]
+        if data.type == 'image':
+            image_link = data.url
+
+    if message.attachments:
+        file = message.attachments[0]
+        if file.url.lower().endswith(('png', 'jpeg', 'jpg', 'gif', 'webp')):
+            image_link = file.url
+        else:
+            text += file.url
+
+    def determine_stars(num):
+        if 11 > num >= 0:
+            return '\N{WHITE MEDIUM STAR}'
+        elif 15 > num >= 11:
+            return '\N{GLOWING STAR}'
+        elif 25 > num >= 15:
+            return '\N{DIZZY SYMBOL}'
+        else:
+            return '\N{SPARKLES}'
+
+    star_emoji = determine_stars(stars)
 
     status = "{emoji} {count}: {channel}\n{author}\n\n{text}".format(emoji=star_emoji, count=stars,
                                                                      channel=star_channel, author=author,
-                                                                     text=real_msg)
+                                                                     text=text)
     info = {'message': status, 'image': image_link}
     return info
 
@@ -157,14 +143,17 @@ async def on_ready():
 
 
 @client.event
-async def on_message(message):
-    if message.author.id != BOT_ID or message.channel.id != STARBOARD_ID:
+async def on_reaction_add(reaction, user):
+    if reaction.message.channel.id != SERVER_ID:
+        return
+
+    if not (reaction.emoji.id == '393129724211232768' and reaction.count >= 10):
         return
 
     log.info("Starboard message detected!")
-    author_id = re.search('(?<=/)(.*?)(?=/)', message.embeds[0]['author']['icon_url'][32:]).group(0) # Id from icon url link
-    author = message.server.get_member(author_id)
-    post_queue[message.timestamp] = [message, str(author)]
+    author = str(reaction.message.author)
+    post_queue[reaction.message.timestamp] = [reaction.message, author]
+
 
 client.loop.create_task(parse_queue())
 log.info("parse_queue() successfully added")
