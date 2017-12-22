@@ -57,8 +57,8 @@ try:
 
     starboard_info = config['starboard_info']
     SERVER_ID = starboard_info['server_id']
-    WAIT_TIME = starboard_info.get('wait_time', fallback=5)
-except KeyError as e:
+    WAIT_TIME = int(starboard_info.get('wait_time', fallback=5))
+except (KeyError, ValueError) as e:
     log.error("Fix your discord config section!")
     msg = "{err} on twitter config ".format(
         err=str(type(e).__name__ + ': ' + str(e)))
