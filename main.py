@@ -74,7 +74,7 @@ def get_message_info(message, author):
     image_link = ''
     text = message.clean_content
     star_channel = '#' + str(message.channel.name)
-    stars = [i.count for i in message.reactions if i.emoji='\N{WHITE MEDIUM STAR}'][0]  # test
+    stars = [i.count for i in message.reactions if i.emoji == '\N{WHITE MEDIUM STAR}'][0]  # test
 
     if message.embeds:
         data = message.embeds[0]
