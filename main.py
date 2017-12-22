@@ -107,6 +107,13 @@ def get_message_info(message, author):
     return info
 
 
+def post_thread(text, attachments):
+    messages = [text[i:i + 120] for i in range(0, len(text), 120)]
+    status = twitter_api.PostUpdate(messages[0], attachments)
+    for i in messages[1:]:
+        status = twitter_api.PostUpdate(i, in_reply_to_status_id=status.id)
+
+
 async def parse_queue():
     await client.wait_until_ready()
     log.info("parse_queue() running")
@@ -123,14 +130,15 @@ async def parse_queue():
                 try:
                     twitter_api.PostUpdate(info['message'], info['image'])
                 except twitter.error.TwitterError:
-                    twitter_api.PostUpdate(info['message'][:139], info['image'])
-                    status = "Truncated " + status
+                    post_thread(info['message'], info['image'])
+                    status = "Threaded " + status
                 log.info(status)
                 remove.append(k)
         await asyncio.sleep(30)
         for i in remove:
             post_queue.pop(i)
             remove.pop(0)
+    await parse_queue()
 
 
 @client.event
