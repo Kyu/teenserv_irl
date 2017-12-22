@@ -124,7 +124,7 @@ async def parse_queue():
                     twitter_api.PostUpdate(info['message'], info['image'])
                 except twitter.error.TwitterError:
                     twitter_api.PostUpdate(info['message'][:139], info['image'])
-                    status = "Truncated " + msg
+                    status = "Truncated " + status
                 log.info(status)
                 remove.append(k)
         await asyncio.sleep(30)
