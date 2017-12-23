@@ -83,10 +83,10 @@ def get_message_info(message, author):
 
     if message.attachments:
         file = message.attachments[0]
-        if file.url.lower().endswith(('png', 'jpeg', 'jpg', 'gif', 'webp')):
-            image_link = file.url
+        if file['url'].lower().endswith(('png', 'jpeg', 'jpg', 'gif', 'webp')):
+            image_link = file['url']
         else:
-            text += file.url
+            text += file['url']
 
     def determine_stars(num):
         if 11 > num >= 0:
