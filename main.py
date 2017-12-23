@@ -68,6 +68,7 @@ except (KeyError, ValueError) as e:
 
 client = discord.Client()
 post_queue = {}
+done = []
 
 
 def get_message_info(message, author):
@@ -120,7 +121,9 @@ async def parse_queue():
     while True:
         remove = []
         now = datetime.utcnow()
-        for k, v in post_queue.copy().items():
+        for k, v in post_queue.items():
+            if v[0].id in done:
+                continue
             if k + timedelta(minutes=WAIT_TIME) > now:
                 pass
             else:
@@ -134,6 +137,7 @@ async def parse_queue():
                     status = "Threaded " + status
                 log.info(status)
                 remove.append(k)
+                done.append(v[0].id)
         await asyncio.sleep(30)
         for i in remove:
             post_queue.pop(i)
